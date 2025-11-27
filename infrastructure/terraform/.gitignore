@@ -1,0 +1,4 @@
+.terraform
+.terraform.lock.hcl
+spark_dependencies.zip
+_spark_venv.tar.gz

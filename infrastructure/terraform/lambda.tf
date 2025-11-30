@@ -121,7 +121,7 @@ resource "aws_lambda_function" "task_manager" {
       EMR_APPLICATION_ID = aws_emrserverless_application.sparkling_water_app.id
       EMR_EXECUTION_ROLE_ARN = aws_iam_role.emr_serverless_execution_role.arn
       SQS_QUEUE_URL = aws_sqs_queue.s3_notifications_queue.url
-      EMR_SCRIPT_PATH = "spark_jobs/sentiment_and_join.py"
+      EMR_SCRIPT_PATH = "spark_jobs/sentiment_and_join-3.py"
     }
   }
 

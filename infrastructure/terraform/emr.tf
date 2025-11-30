@@ -99,8 +99,49 @@ resource "aws_iam_policy" "emr_serverless_s3_policy" {
   })
 }
 
+# IAM Policy for EMR Serverless to access DynamoDB
+resource "aws_iam_policy" "emr_serverless_dynamodb_policy" {
+  name        = "${local.name_prefix}-emr-serverless-dynamodb-policy"
+  description = "Policy for EMR Serverless to access DynamoDB tables"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "dynamodb:List*",
+          "dynamodb:DescribeReservedCapacity*",
+          "dynamodb:DescribeLimits",
+          "dynamodb:DescribeTimeToLive",
+          "dynamodb:BatchGetItem",
+          "dynamodb:BatchWriteItem",
+          "dynamodb:ConditionCheckItem",
+          "dynamodb:DeleteItem",
+          "dynamodb:DescribeTable",
+          "dynamodb:GetItem",
+          "dynamodb:PutItem",
+          "dynamodb:Query",
+          "dynamodb:Scan",
+          "dynamodb:UpdateItem"
+        ]
+        Resource = [
+          "arn:aws:dynamodb:*:*:table/${local.name_prefix}-*",
+          "arn:aws:dynamodb:*:*:table/${local.name_prefix}-*/index/*"
+        ]
+      }
+    ]
+  })
+}
+
 # Attach the S3 policy
 resource "aws_iam_role_policy_attachment" "emr_serverless_s3" {
   role       = aws_iam_role.emr_serverless_execution_role.name
   policy_arn = aws_iam_policy.emr_serverless_s3_policy.arn
+}
+
+# Attach the DynamoDB policy
+resource "aws_iam_role_policy_attachment" "emr_serverless_dynamodb" {
+  role       = aws_iam_role.emr_serverless_execution_role.name
+  policy_arn = aws_iam_policy.emr_serverless_dynamodb_policy.arn
 }

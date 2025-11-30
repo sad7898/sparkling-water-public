@@ -2,3 +2,5 @@ numpy
 pandas
 pyarrow
 transformers==4.57.1
+botocore
+boto3

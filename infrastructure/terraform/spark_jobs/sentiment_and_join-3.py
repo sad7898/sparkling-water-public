@@ -1,13 +1,16 @@
 import os
+from datetime import datetime
+from typing import List
+from decimal import Decimal
 os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"
 os.environ["TRANSFORMERS_OFFLINE"] = "1"
 os.environ["HF_HUB_OFFLINE"] = "1"
-
+import boto3
 import sys
 from pyspark.sql import SparkSession, DataFrame, functions, types
 from pyspark.sql.functions import col, pandas_udf, PandasUDFType
 from pyspark.sql.types import StructType, StructField, StringType, FloatType
-import argparse
+
 
 RAW_REDDIT_PATH = "raw/reddit/cryptocurrency"
 COIN_ALIASES = {
@@ -29,15 +32,12 @@ def initialize_spark(app_name: str):
     return spark
 
 def build_sentiment_udf():
-
     # Define the schema for the UDF output
     sentiment_schema = StructType([
         StructField("sentiment_label", StringType()),
         StructField("sentiment_score", FloatType())
     ])
 
-    # Iterator-style pandas UDF
-    # @pandas_udf(sentiment_schema, functionType="iterator")
     @pandas_udf(sentiment_schema, functionType=PandasUDFType.SCALAR_ITER)
     def sentiment_udf(texts_iter):
         import pandas as pd
@@ -48,7 +48,7 @@ def build_sentiment_udf():
             model="./hf_model",
             tokenizer="./hf_model",
             device=-1,
-        )  # load once per worker
+        )
         for texts in texts_iter:
             labels, scores = [], []
             for t in texts.fillna(""):
@@ -57,8 +57,15 @@ def build_sentiment_udf():
                     scores.append(0.0)
                 else:
                     result = model(t[:512])[0]
-                    labels.append(result["label"].lower())
-                    scores.append(float(result["score"]))
+                    label = result["label"].lower()
+                    confidence = float(result["score"])
+                    if label == "positive":
+                        signed_score = confidence
+                    elif label == "negative":
+                        signed_score = -confidence
+                    
+                    labels.append(label)
+                    scores.append(signed_score)
             yield pd.DataFrame({"sentiment_label": labels, "sentiment_score": scores})
 
     return sentiment_udf
@@ -122,11 +129,13 @@ def aggregate_sentiment(reddit_df: DataFrame):
    df = reddit_df.filter(functions.col("coin").isNotNull())
 
 
+
    agg = df.groupBy("coin").agg(
        functions.sum(functions.when(functions.col("sentiment_label") == "positive", 1).otherwise(0)).alias("positive_count"),
        functions.sum(functions.when(functions.col("sentiment_label") == "negative", 1).otherwise(0)).alias("negative_count"),
        functions.avg(functions.col("sentiment_score")).alias("sentiment_score"),
    )
+
 
 
    agg = agg.withColumn(
@@ -136,7 +145,9 @@ def aggregate_sentiment(reddit_df: DataFrame):
                 .otherwise(functions.lit("neutral")),
    )
 
-   return agg.select("coin", "sentiment_label", "sentiment_score", "positive_count", "negative_count")
+   final_result = agg.select("coin", "sentiment_label", "sentiment_score", "positive_count", "negative_count")
+
+   return final_result
 
 def load_coingecko_data(spark: SparkSession, input_s3: str) -> DataFrame:
 
@@ -144,6 +155,7 @@ def load_coingecko_data(spark: SparkSession, input_s3: str) -> DataFrame:
     year, month, day, hour = path_parts[-4:]
     bucket = path_parts[2]  # Extract bucket name from s3://bucket/...
     coingecko_path = f"s3://{bucket}/raw/coingecko/*/{year}/{month}/{day}/{hour}"
+    
     
 
     df = spark.read.option("recursiveFileLookup", "true") \
@@ -189,6 +201,22 @@ def join_sentiment_with_price(reddit_df: DataFrame, price_df: DataFrame):
     )
     return joined
 
+def write_to_dynamodb(rows: list, table_name: str):
+    dynamodb = boto3.resource('dynamodb', region_name='us-east-1')
+    table = dynamodb.Table(table_name)
+    current_ts = datetime.utcnow().isoformat()
+    for row in rows:
+        item = {
+            'coin': str(row['coin']),
+            'current_ts': str(current_ts),
+            'price_usd': Decimal(row['price_usd']),
+            'price_sample_count': int(row['price_sample_count']),
+            'sentiment_label': str(row['sentiment_label']),
+            'sentiment_score': Decimal(row['sentiment_score']),
+        }
+        table.put_item(TableName=table_name, Item=item)
+
+
 def run_job(input_s3: str, output_s3: str):
     spark = initialize_spark("SentimentAndJoin")
     
@@ -214,18 +242,25 @@ def run_job(input_s3: str, output_s3: str):
 
     out = (
         joined
-        .withColumn("date", functions.lit(f"{year}-{month}-{day}"))
+        .withColumn("year", functions.lit(year))
+        .withColumn("month", functions.lit(month))
+        .withColumn("day", functions.lit(day))
         .withColumn("hour", functions.lit(hour))
     )
-
+    out.cache()
     (out
-        .repartition("date", "hour", "coin")
+        .repartition("coin", "year", "month", "day", "hour")
            .write
            .mode("append")
-           .partitionBy("date", "hour", "coin")
+           .partitionBy("coin", "year", "month", "day", "hour")
            .parquet(output_path)
     )
-
+    output = out.select(functions.col("coin"),
+                        functions.col("price_usd").cast("string").alias("price_usd"),
+                        functions.col("price_sample_count"),
+                        functions.col("sentiment_label"),
+                        functions.col("sentiment_score").cast("string").alias("sentiment_score")).collect()
+    write_to_dynamodb(output, table_name="sparkling-water-dev-crypto-sentiment")
     print(f"Wrote joined data to {output_path}")
     spark.stop()
 

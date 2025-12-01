@@ -6,8 +6,6 @@
 
 Tracks Reddit discussions and crypto prices to analyze sentiment trends in real-time.
 
-**NOTE**: This project is a 4-person group project for CMPT732 but cloned from SFU internal github 
-
 ## Architecture
 
 - Lambda for data extraction

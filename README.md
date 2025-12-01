@@ -8,7 +8,8 @@ Tracks Reddit discussions and crypto prices to analyze sentiment trends in real-
 ***This project is for CMPT732 final project cloned from SFU GitHub*** 
 ## Architecture
 
-<img width="877" alt="image" src="https://media.github.sfu.ca/user/4998/files/b9633f0d-d0b2-4e73-9894-70f2a4d43e47">
+<img width="877" height="477" alt="image" src="https://github.com/user-attachments/assets/6f6dd3ea-d1a3-444b-8ec8-de67edbc3488" />
+
 
 ## Setup Instructions
 

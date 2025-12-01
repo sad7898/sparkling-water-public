@@ -10,13 +10,6 @@ Tracks Reddit discussions and crypto prices to analyze sentiment trends in real-
 
 <img width="877" height="477" alt="image" src="https://github.com/user-attachments/assets/6f6dd3ea-d1a3-444b-8ec8-de67edbc3488" />
 
-
-## Setup Instructions
-
-1. `conda env create -f environment.yml`
-2. `python data_ingestion/coingecko_pipeline.py`
-3. (optional) `aws configure` for S3 access
-
 ## Repo Structure
 
 infrastructure/terraform => infrastructure configuration
@@ -33,15 +26,24 @@ If you only want to run the UI
 
 1. **AWS CLI** installed and configured
    ```bash
-   aws configure
+   aws configure --profile=sparkling-water-guest
    ```
 2. **AWS Credentials** with appropriate permissions:
    - DynamoDB Read access
 
-3. Install python dependencies
+   We will provide read-only credential alongside the project report.
+
+   
+
+4. Install python dependencies
    ```bash
    pip3 install -r /app/frontend/requirements.txt
    ```
+3. Set AWS_PROFILE
+   ```bash
+   export AWS_PROFILE=sparkling-water-guest
+   ```
+
 4. Run streamlit
    ```bash
    streamlit run app/frontend/app.py

@@ -5,15 +5,10 @@
 ## Overview
 
 Tracks Reddit discussions and crypto prices to analyze sentiment trends in real-time.
-
 ***This project is for CMPT732 final project cloned from SFU GitHub*** 
-
 ## Architecture
 
-- Lambda for data extraction
-- S3 as data lake
-- EMR (Spark) for sentiment analysis
-- Streamlit dashboard for visualization
+<img width="877" alt="image" src="https://media.github.sfu.ca/user/4998/files/b9633f0d-d0b2-4e73-9894-70f2a4d43e47">
 
 ## Setup Instructions
 
@@ -23,13 +18,36 @@ Tracks Reddit discussions and crypto prices to analyze sentiment trends in real-
 
 ## Repo Structure
 
-data_ingestion/ → scripts for Reddit & CoinGecko data  
-sentiment_analysis/ → Spark + Hugging Face  
-dashboard/ → Streamlit web app  
-docs/ → report, diagrams, proposal
+infrastructure/terraform => infrastructure configuration
+
+infrastructure/terraform/spark_jobs => spark script for EMR
+
+app/ ==> each directory contains source codes for each lambda function except frontend
+
+app/frontend ==> streamlit frontend
 
 
-## Prerequisites
+## Running the UI
+If you only want to run the UI
+
+1. **AWS CLI** installed and configured
+   ```bash
+   aws configure
+   ```
+2. **AWS Credentials** with appropriate permissions:
+   - DynamoDB Read access
+
+3. Install python dependencies
+   ```bash
+   pip3 install -r /app/frontend/requirements.txt
+   ```
+4. Run streamlit
+   ```bash
+   streamlit run app/frontend/app.py
+   ```
+
+   
+## Deployment Prerequisites
 
 Before deploying, ensure you have:
 
@@ -37,6 +55,7 @@ Before deploying, ensure you have:
    ```bash
    aws configure
    ```
+
 
 2. **Terraform** installed (version >= 1.2)
    ```bash
@@ -52,13 +71,17 @@ Before deploying, ensure you have:
    - IAM role creation
    - EventBridge/CloudWatch Events
    - CloudWatch Logs
+   - Dynamodb
+   - EMR
 
-4. **S3 Backend Bucket** (optional but recommended):
+4. **S3 Backend Bucket**: 
+   Create an S3 bucket to store terraform state
    ```bash
    aws s3 mb s3://your-terraform-state-bucket
    ```
+   or use AWS console
 
-## Local Deployment
+## Deployment
 
 ### Step 1: Clone and Navigate
 ```bash
@@ -81,7 +104,7 @@ terraform plan
 
 Optional: Specify environment and customize variables:
 ```bash
-terraform plan -var="environment=dev" -var="project_name=my-pipeline"
+terraform plan
 ```
 
 ### Step 4: Deploy Infrastructure
@@ -95,12 +118,12 @@ terraform apply -var="environment=prod" -var="data_extraction_schedule=rate(10 m
 ```
 
 ### Step 5: Verify Deployment
-After successful deployment, you should see output similar to:
-```
-data_bucket_name = "sparkling-water-dev-data-bucket"
-processed_data_bucket_name = "sparkling-water-dev-processed-data-bucket"
-data_extractor_lambda_arn = "arn:aws:lambda:us-east-1:..."
-```
+Go to AWS console to check resource configuration
+
+### Step 6: Upload Spark Script
+1. Go to AWS S3 console and upload spark script to bucket **sparkling-water-dev-data-bucket** (default script is **sentiment_and_join-3.py**)
+2. If script is different from default, go to AWS Lambda console. Click on lambda function named **sparkling-water-dev-task-manager**
+   Change environment variable **EMR_SCRIPT_PATH** to appropiate location
 
 ## Configuration Options
 
@@ -113,6 +136,7 @@ terraform apply \
   -var="data_extraction_schedule=rate(2 minutes)" \
   -var="aws_region=us-west-2"
 ```
+
 
 Available variables:
 - `project_name`: Name prefix for resources (default: "sparkling-water")

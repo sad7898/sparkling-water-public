@@ -15,7 +15,7 @@ from botocore.exceptions import BotoCoreError, ClientError
 from streamlit_autorefresh import st_autorefresh
 
 DEFAULT_REGION = os.getenv("AWS_REGION", "us-east-1")
-DEFAULT_PROFILE = os.getenv("AWS_PROFILE", "sparkling-water")
+DEFAULT_PROFILE = os.getenv("AWS_PROFILE")
 COIN_ORDER = ["bitcoin", "ethereum", "dogecoin"]
 COIN_NAME_MAP: Dict[str, str] = {
     "bitcoin": "Bitcoin",

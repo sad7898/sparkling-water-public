@@ -279,14 +279,10 @@ if filtered.empty:
     st.warning("No records match the current selections. Try expanding the filters.")
     st.stop()
 
-aggregated = pd.DataFrame()
-if "timestamp" in filtered.columns:
-    aggregated = (
-        filtered.set_index("timestamp")
-        .resample("H")
-        .agg({"price_usd": "mean", "sentiment_score": "mean"})
-        .dropna(how="all")
-    )
+# Use raw filtered data instead of aggregating by hour
+plot_data = filtered.copy()
+if "timestamp" in plot_data.columns:
+    plot_data = plot_data.sort_values("timestamp")
 
 sentiment_distribution = (
     filtered.groupby("sentiment_label").size().rename("count").reset_index()
@@ -295,14 +291,10 @@ sentiment_distribution["sentiment_label"] = sentiment_distribution["sentiment_la
     _format_sentiment_label
 )
 
-sentiment_trend = pd.Series(dtype=float)
+# Remove sentiment trend aggregation - use raw data
+sentiment_trend_data = pd.DataFrame()
 if "timestamp" in filtered.columns:
-    sentiment_trend = (
-        filtered.set_index("timestamp")
-        .resample("H")["sentiment_score"]
-        .mean()
-        .dropna()
-    )
+    sentiment_trend_data = filtered[["timestamp", "sentiment_score"]].dropna().sort_values("timestamp")
 
 correlation = pd.NA
 price_sentiment_df = filtered[["price_usd", "sentiment_score"]].dropna()
@@ -339,27 +331,41 @@ if price_sample_count is not None and not pd.isna(price_sample_count):
     st.caption(f"Price sample count for latest hour: {int(price_sample_count)}")
 
 # Dual-axis price vs sentiment chart
-if not aggregated.empty:
+if not plot_data.empty and "timestamp" in plot_data.columns:
+    # Use raw data points instead of aggregated hourly data
+    plot_subset = plot_data[["timestamp", "price_usd", "sentiment_score"]].dropna(subset=["timestamp"])
+    
     fig_price_sentiment = go.Figure()
-    fig_price_sentiment.add_trace(
-        go.Scatter(
-            x=aggregated.index,
-            y=aggregated["price_usd"],
-            mode="lines",
-            name="Avg price (USD)",
-            line=dict(color="#29b5e8", width=3),
+    
+    # Plot raw price data
+    price_data = plot_subset[["timestamp", "price_usd"]].dropna(subset=["price_usd"])
+    if not price_data.empty:
+        fig_price_sentiment.add_trace(
+            go.Scatter(
+                x=price_data["timestamp"],
+                y=price_data["price_usd"],
+                mode="lines+markers",
+                name="Price (USD)",
+                line=dict(color="#29b5e8", width=2),
+                marker=dict(size=4),
+            )
         )
-    )
-    fig_price_sentiment.add_trace(
-        go.Scatter(
-            x=aggregated.index,
-            y=aggregated["sentiment_score"],
-            mode="lines",
-            name="Avg sentiment score",
-            line=dict(color="#f9c74f", width=3, dash="dot"),
-            yaxis="y2",
+    
+    # Plot raw sentiment data
+    sentiment_data = plot_subset[["timestamp", "sentiment_score"]].dropna(subset=["sentiment_score"])
+    if not sentiment_data.empty:
+        fig_price_sentiment.add_trace(
+            go.Scatter(
+                x=sentiment_data["timestamp"],
+                y=sentiment_data["sentiment_score"],
+                mode="lines+markers",
+                name="Sentiment score",
+                line=dict(color="#f9c74f", width=2, dash="dot"),
+                marker=dict(size=4),
+                yaxis="y2",
+            )
         )
-    )
+    
     fig_price_sentiment.update_layout(
         margin=dict(l=40, r=40, t=60, b=40),
         hovermode="x unified",
@@ -400,15 +406,15 @@ with col_left:
         st.info("Sentiment label distribution unavailable for this selection.")
 
 with col_right:
-    if not sentiment_trend.empty:
+    if not sentiment_trend_data.empty:
         fig_trend = px.line(
-            sentiment_trend.reset_index(),
+            sentiment_trend_data,
             x="timestamp",
             y="sentiment_score",
-            title=f"Hourly average sentiment",
+            title=f"Sentiment score over time",
             labels={"timestamp": "Timestamp", "sentiment_score": "Sentiment score"},
         )
-        fig_trend.update_traces(line=dict(color="#f3722c", width=3))
+        fig_trend.update_traces(line=dict(color="#f3722c", width=2), marker=dict(size=4))
         fig_trend.update_layout(margin=dict(l=40, r=20, t=60, b=40))
         st.plotly_chart(fig_trend, use_container_width=True)
     else:

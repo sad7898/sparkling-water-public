@@ -35,35 +35,6 @@ def _get_dynamo_table(table_name: str):
     return dynamo_resource.Table(table_name)
 
 
-def _build_sample_data() -> pd.DataFrame:
-    """Return an in-memory demo dataset for quick UI previews."""
-    base_time = pd.Timestamp.utcnow().floor("H") - pd.Timedelta(hours=23)
-    records: List[Dict[str, object]] = []
-    sentiments = ["positive", "neutral", "negative"]
-    scores = [0.68, 0.04, -0.42]
-    prices = {
-        "bitcoin": 67000,
-        "ethereum": 3500,
-        "dogecoin": 0.19,
-    }
-
-    for idx, coin in enumerate(COIN_ORDER):
-        for step in range(24):
-            ts = base_time + pd.Timedelta(hours=step)
-            records.append(
-                {
-                    "coin": coin,
-                    "current_ts": ts.isoformat(),
-                    "sentiment_label": sentiments[(idx + step) % len(sentiments)],
-                    "sentiment_score": scores[(idx + step) % len(scores)] + (step % 4) * 0.015,
-                    "price_usd": prices[coin] * (1 + (step - 12) * 0.002),
-                    "price_sample_count": 12,
-                }
-            )
-
-    return pd.DataFrame.from_records(records)
-
-
 def _coerce_datetime_columns(df: pd.DataFrame) -> pd.DataFrame:
     for column in DATETIME_COLUMNS:
         if column in df.columns:
@@ -171,21 +142,12 @@ def _format_sentiment_label(label: str) -> str:
 
 
 st.set_page_config(
-    page_title="Crypto Sentiment Intelligence Dashboard",
+    page_title="Sparkling Water: Crypto Sentiment Intelligence Dashboard",
     page_icon="📊",
     layout="wide",
 )
 
 st.sidebar.title("Configuration")
-st.sidebar.caption(
-    "Choose between demo data or the processed dataset stored in DynamoDB."
-)
-
-data_source = st.sidebar.radio(
-    "Data source",
-    options=("Sample (demo)", "DynamoDB"),
-    index=0,
-)
 
 auto_refresh = st.sidebar.checkbox(
     "Auto-refresh",
@@ -203,19 +165,15 @@ if auto_refresh:
     )
     st_autorefresh(interval=refresh_interval_seconds * 1000, limit=None, key="auto_refresh_counter")
 
-
-dynamo_table = DEFAULT_DYNAMO_TABLE
-dynamo_limit = DEFAULT_DYNAMO_LIMIT
-if data_source == "DynamoDB":
-    dynamo_table = st.sidebar.text_input("Table name", value=DEFAULT_DYNAMO_TABLE)
-    dynamo_limit = st.sidebar.slider(
-        "Max items to fetch",
-        min_value=100,
-        max_value=5000,
-        value=min(DEFAULT_DYNAMO_LIMIT, 2000),
-        step=100,
-        help="Adjust to balance load vs. fidelity."
-    )
+dynamo_table = st.sidebar.text_input("Table name", value=DEFAULT_DYNAMO_TABLE)
+dynamo_limit = st.sidebar.slider(
+    "Max items to fetch",
+    min_value=100,
+    max_value=5000,
+    value=min(DEFAULT_DYNAMO_LIMIT, 2000),
+    step=100,
+    help="Adjust to balance load vs. fidelity."
+)
 
 reload_requested = st.sidebar.button("Clear cache & reload")
 if reload_requested:
@@ -223,10 +181,7 @@ if reload_requested:
     st.rerun()
 
 try:
-    if data_source == "Sample (demo)":
-        dataset = _normalize_columns(_build_sample_data())
-    else:
-        dataset = load_data_from_dynamo(dynamo_table.strip() or DEFAULT_DYNAMO_TABLE, int(dynamo_limit))
+    dataset = load_data_from_dynamo(dynamo_table.strip() or DEFAULT_DYNAMO_TABLE, int(dynamo_limit))
 except Exception as err:  
     st.error(str(err))
     st.stop()
@@ -362,11 +317,11 @@ latest_price = latest_row.get("price_usd", float("nan"))
 avg_sentiment = filtered["sentiment_score"].mean()
 price_sample_count = latest_row.get("price_sample_count")
 
-st.title("Crypto Sentiment Intelligence Dashboard")
+st.title("Sparkling Water: Crypto Sentiment Intelligence Dashboard")
 st.markdown(
     "Explore the relationship between Reddit sentiment and market performance "
     "for major crypto assets. Data reflects processed outputs captured by the "
-    "Spark job and persisted in DynamoDB (sample mode uses synthetic data)."
+    "Spark job and persisted in DynamoDB."
 )
 
 kpi_col1, kpi_col2, kpi_col3 = st.columns(3)
@@ -517,6 +472,6 @@ with st.expander("Peek at underlying data"):
     )
 
 st.caption(
-    "Dashboard built with Streamlit, Plotly, pandas, and boto3. Switch the data "
-    "source in the sidebar to view DynamoDB records or sample data."
+    "Dashboard built with Streamlit, Plotly, pandas, and boto3. "
+    "Data is loaded from DynamoDB in real-time."
 )

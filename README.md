@@ -5,10 +5,16 @@
 ## Overview
 
 Tracks Reddit discussions and crypto prices to analyze sentiment trends in real-time.
-***This project is for CMPT732 final project cloned from SFU GitHub*** 
+
+Deployed with Render.com on URL
+
+**https://sparkling-water-public.onrender.com**
+
 ## Architecture
 
-<img width="877" height="477" alt="image" src="https://github.com/user-attachments/assets/6f6dd3ea-d1a3-444b-8ec8-de67edbc3488" />
+<img width="877" alt="image" src="https://media.github.sfu.ca/user/4998/files/b9633f0d-d0b2-4e73-9894-70f2a4d43e47">
+
+
 
 ## Repo Structure
 
@@ -26,24 +32,15 @@ If you only want to run the UI
 
 1. **AWS CLI** installed and configured
    ```bash
-   aws configure --profile=sparkling-water-guest
+   aws configure
    ```
 2. **AWS Credentials** with appropriate permissions:
    - DynamoDB Read access
 
-   We will provide read-only credential alongside the project report.
-
-   
-
-4. Install python dependencies
+3. Install python dependencies
    ```bash
    pip3 install -r /app/frontend/requirements.txt
    ```
-3. Set AWS_PROFILE
-   ```bash
-   export AWS_PROFILE=sparkling-water-guest
-   ```
-
 4. Run streamlit
    ```bash
    streamlit run app/frontend/app.py
